@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>UCRI | App Creador Andino</title>
+    <!-- Fuentes: Outfit (Futurista) e Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        andino: {
+                            magenta: '#E11D48', // Color Chicha/Textil
+                            cyan: '#06B6D4',    // Azul eléctrico
+                            gold: '#F59E0B',    // Oro Inca
+                            purple: '#7C3AED',  // Morado profundo
+                            dark: '#09090B'     // Negro profundo
+                        }
+                    },
+                    fontFamily: { sans: ['"Inter"', 'sans-serif'], display: ['"Outfit"', 'sans-serif'] },
+                    animation: {
+                        'pulse-glow': 'pulseGlow 2s infinite alternate',
+                        'spin-slow': 'spin 10s linear infinite',
+                        'pop': 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards'
+                    },
+                    keyframes: {
+                        pulseGlow: { '0%': { boxShadow: '0 0 20px #E11D48, inset 0 0 20px #E11D48' }, '100%': { boxShadow: '0 0 60px #E11D48, inset 0 0 40px #7C3AED' } },
+                        popIn: { '0%': { transform: 'scale(0.5)', opacity: '0' }, '100%': { transform: 'scale(1)', opacity: '1' } }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #09090B; color: #FFFFFF; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+        
+        /* Botón de Encendido Gigante */
+        .power-btn {
+            width: 280px; height: 280px; border-radius: 50%;
+            background: linear-gradient(135deg, #E11D48, #7C3AED);
+            display: flex; justify-content: center; align-items: center;
+            cursor: pointer; transition: all 0.3s ease; border: 8px solid #09090B;
+            box-shadow: 0 0 40px rgba(225, 29, 72, 0.5);
+        }
+        .power-btn:active { transform: scale(0.9); }
+        .power-listening { background: linear-gradient(135deg, #06B6D4, #F59E0B); animation: pulseGlow 1s infinite alternate; }
+        .power-waiting { background: linear-gradient(135deg, #F59E0B, #E11D48); animation: pulseGlow 0.5s infinite alternate; }
+
+        /* Fondo Vibrante Andino */
+        .bg-mesh {
+            background-color: #09090B;
+            background-image: 
+                radial-gradient(at 0% 0%, hsla(328,86%,50%,0.3) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, hsla(189,94%,43%,0.3) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, hsla(38,92%,50%,0.3) 0px, transparent 50%),
+                radial-gradient(at 0% 100%, hsla(262,83%,58%,0.3) 0px, transparent 50%);
+        }
+
+        .glass-card { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(16px); border: 2px solid rgba(255,255,255,0.2); border-radius: 32px; }
+        .text-huge { font-size: clamp(3rem, 10vw, 6rem); line-height: 1.1; }
+        
+        /* Ocultar scrollbar pero permitir scroll */
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-mesh h-screen flex flex-col relative" id="appBody">
+
+    <!-- ========================================== -->
+    <!-- PANTALLA 1: ONBOARDING ZERO-UI (BOTÓN GIGANTE) -->
+    <!-- ========================================== -->
+    <div id="authScreen" class="absolute inset-0 z-50 flex flex-col justify-center items-center p-6 transition-opacity duration-500">
+        
+        <div class="text-center mb-16 animate-pop" id="textContainer">
+            <h1 class="font-display font-black text-huge text-white drop-shadow-[0_0_15px_rgba(225,29,72,0.8)]" id="mainTitle">UCRI</h1>
+            <p class="text-3xl font-bold text-andino-gold mt-4 uppercase tracking-widest leading-tight" id="subTitle">Toca para<br>iniciar</p>
+        </div>
+
+        <button onclick="requestMicrophoneAccess()" id="giantPowerBtn" class="power-btn animate-pulse-glow shadow-2xl relative group focus:outline-none">
+            <div class="absolute inset-0 rounded-full border-4 border-dashed border-white/30 animate-spin-slow group-hover:border-white transition-colors" id="spinRing"></div>
+            <i class="fa-solid fa-power-off text-8xl text-white drop-shadow-lg transition-transform group-hover:scale-110" id="btnIcon"></i>
+        </button>
+
+        <!-- Indicador de Status Visual -->
+        <div id="statusPulse" class="mt-16 flex gap-4 hidden">
+            <div class="w-5 h-5 bg-andino-cyan rounded-full animate-bounce"></div>
+            <div class="w-5 h-5 bg-andino-gold rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
+            <div class="w-5 h-5 bg-andino-magenta rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PANTALLA 2: EL DASHBOARD DEL EMPRENDEDOR -->
+    <!-- ========================================== -->
+    <main class="flex-grow overflow-y-auto hide-scroll pb-28 pt-8 px-6 hidden relative z-40" id="mainDashboard">
+        
+        <header class="flex justify-between items-center mb-10">
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-andino-cyan rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.6)]">
+                    <i class="fa-solid fa-eye-low-vision text-black text-3xl"></i>
+                </div>
+                <div>
+                    <h2 class="font-display font-black text-3xl text-white leading-none">UCRI</h2>
+                    <span class="text-sm font-bold text-andino-gold uppercase tracking-widest">Cusco</span>
+                </div>
+            </div>
+            <button onclick="logout()" class="w-14 h-14 glass-card flex justify-center items-center text-andino-magenta hover:bg-white/20 transition focus:outline-none shadow-lg">
+                <i class="fa-solid fa-power-off text-2xl"></i>
+            </button>
+        </header>
+
+        <!-- Tarjeta de Perfil Generada por Voz -->
+        <div class="glass-card p-10 mb-10 text-center border-t-8 border-t-andino-magenta relative overflow-hidden shadow-2xl">
+            <div class="absolute -top-12 -right-12 text-[10rem] opacity-10 text-white"><i class="fa-solid fa-mountain-sun"></i></div>
+            
+            <div class="w-32 h-32 mx-auto rounded-full bg-gradient-to-br from-andino-cyan to-andino-purple flex items-center justify-center text-5xl font-display font-black border-4 border-white mb-6 shadow-[0_0_30px_rgba(6,182,212,0.8)]" id="profileInitials"></div>
+            
+            <h2 class="text-5xl font-display font-black text-white mb-4 drop-shadow-md" id="profileName">Cargando...</h2>
+            <div class="flex flex-col gap-3 items-center justify-center mt-6">
+                <span class="text-xl font-bold bg-white/20 px-6 py-2 rounded-2xl border border-white/30 text-andino-gold backdrop-blur-md shadow-inner"><i class="fa-solid fa-shop mr-2"></i><span id="profileEnterprise">Cargando...</span></span>
+                <span class="text-base font-bold text-white/80 bg-black/30 px-4 py-1 rounded-full"><i class="fa-solid fa-phone mr-2"></i><span id="profilePhone">---</span></span>
+            </div>
+        </div>
+
+        <!-- Botón Gigante para Crear Servicio (Voz) -->
+        <button onclick="startCreateServiceFlow()" class="w-full glass-card !rounded-[48px] py-12 flex flex-col justify-center items-center gap-6 hover:bg-white/20 transition border-4 border-dashed border-andino-gold focus:outline-none shadow-2xl group" id="createServiceBtn">
+            <div class="w-24 h-24 rounded-full bg-andino-gold flex justify-center items-center shadow-[0_0_40px_rgba(245,158,11,0.8)] group-hover:scale-110 transition-transform" id="createIconBox">
+                <i class="fa-solid fa-microphone-lines text-5xl text-black" id="createIcon"></i>
+            </div>
+            <h3 class="text-4xl font-display font-black text-white uppercase tracking-widest text-center drop-shadow-md" id="createText">Vender un<br>Producto</h3>
+        </button>
+
+        <h3 class="text-3xl font-display font-black uppercase mt-12 mb-6 text-andino-cyan border-b-4 border-white/20 pb-3 drop-shadow-md">Tu Catálogo</h3>
+        <div id="feedServicios" class="space-y-8"></div>
+
+    </main>
+
+    <!-- ========================================== -->
+    <!-- TECLADO DE EMERGENCIA (FALLBACK)           -->
+    <!-- ========================================== -->
+    <div id="emergencyKeyboard" class="fixed bottom-0 left-0 w-full p-6 bg-black/95 backdrop-blur-3xl border-t-4 border-andino-magenta z-[100] hidden flex flex-col gap-4 transform transition-transform shadow-[0_-10px_40px_rgba(0,0,0,0.8)]">
+        <div class="flex justify-between items-center px-2">
+            <span class="text-sm font-black text-andino-gold uppercase tracking-widest"><i class="fa-solid fa-triangle-exclamation mr-2"></i>Modo Teclado</span>
+            <button onclick="hideEmergencyKeyboard()" class="text-white/70 hover:text-white text-2xl focus:outline-none"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="flex flex-col gap-3">
+            <p class="text-white font-bold text-lg" id="emergencyPromptText">Escribe tu respuesta aquí:</p>
+            <div class="flex gap-3">
+                <input type="text" id="manualInputText" class="flex-grow bg-white/10 border-2 border-white/30 text-white rounded-2xl p-4 focus:outline-none focus:border-andino-cyan font-bold text-xl placeholder-white/40 shadow-inner" placeholder="...">
+                <button onclick="submitEmergencyText()" class="bg-andino-cyan text-black px-8 rounded-2xl font-black text-2xl hover:bg-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.6)] focus:outline-none transition-colors"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MOTOR DE INTELIGENCIA VIRTUAL "LYRA" Y ZERO-UI -->
+    <script>
+        let usersDB = JSON.parse(localStorage.getItem('ucri_users_db')) || [];
+        let currentUser = null;
+        
+        let onboardStep = "INIT"; 
+        let tempUser = { nombre: "", apellidos: "", telefono: "", emprendimiento: "" };
+        
+        let publishStep = "INIT";
+        let tempService = { titulo: "", precio: "", desc: "" };
+
+        let activeVoiceCallback = null;
+        let isMicrophoneAuthorized = false;
+
+        // --- SISTEMA NATIVO DE VOZ (TTS y STT) ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+        
+        if(SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.lang = 'es-PE';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+        }
+
+        // Sintetizador de Voz (Lyra)
+        function hablar(texto, callback) {
+            if('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                let u = new SpeechSynthesisUtterance(texto);
+                u.lang = 'es-ES'; u.rate = 1.05; u.pitch = 1.2; 
+                
+                let voices = window.speechSynthesis.getVoices();
+                let bestVoice = voices.find(v => v.name.includes('Monica') || v.name.includes('Google español') || v.lang.includes('es'));
+                if (bestVoice) u.voice = bestVoice;
+                
+                if(callback) u.onend = callback;
+                window.speechSynthesis.speak(u);
+            } else {
+                if(callback) callback();
+            }
+        }
+
+        function playBeep() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                osc.type = 'sine'; osc.frequency.setValueAtTime(800, ctx.currentTime);
+                osc.connect(ctx.destination);
+                osc.start(); osc.stop(ctx.currentTime + 0.15);
+            } catch(e) { console.log("AudioContext no soportado o bloqueado"); }
+        }
+
+        // --- GESTIÓN DE PERMISOS NATIVOS ---
+        function requestMicrophoneAccess() {
+            if(onboardStep !== "INIT") return; // Prevenir múltiples toques
+
+            setUIDisplay("PERMISOS", "Revisa tu pantalla", "WAITING_TAP");
+            hablar("UCRI necesita acceso a tu micrófono. Por favor, toca 'Permitir' en tu pantalla para continuar.");
+
+            // Solicitud real a la API del navegador
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(function(stream) {
+                    // Permiso Concedido
+                    isMicrophoneAuthorized = true;
+                    // Cerramos el stream inmediatamente, solo queríamos el permiso
+                    stream.getTracks().forEach(track => track.stop());
+                    
+                    setUIDisplay("¡LISTO!", "Micrófono activado");
+                    hablar("Permiso concedido.", () => {
+                        powerButtonTapped(); // Inicia el flujo real
+                    });
+                })
+                .catch(function(err) {
+                    // Permiso Denegado o Error
+                    isMicrophoneAuthorized = false;
+                    console.warn("Micrófono denegado o error:", err);
+                    setUIDisplay("SIN AUDIO", "Usando modo manual");
+                    hablar("No se pudo acceder al micrófono. Activando el modo de escritura manual.", () => {
+                        powerButtonTapped(); // Inicia el flujo, pero usará el teclado de emergencia
+                    });
+                });
+        }
+
+        // --- RECONOCIMIENTO DE VOZ BLINDADO ---
+        function escuchar(promptText, callbackExito) {
+            activeVoiceCallback = callbackExito;
+            document.getElementById('emergencyPromptText').innerText = promptText;
+
+            if(!recognition || !isMicrophoneAuthorized) { 
+                showEmergencyKeyboard(); 
+                return; 
+            }
+            
+            document.getElementById('statusPulse').classList.remove('hidden');
+            
+            recognition.onresult = (e) => {
+                let texto = e.results[0][0].transcript.trim();
+                document.getElementById('statusPulse').classList.add('hidden');
+                hideEmergencyKeyboard();
+                callbackExito(texto);
+            };
+
+            recognition.onerror = (e) => {
+                console.warn("Error reconocimiento:", e.error);
+                document.getElementById('statusPulse').classList.add('hidden');
+                showEmergencyKeyboard();
+            };
+
+            try { 
+                recognition.start(); 
+            } catch (error) { 
+                console.warn("Reinicio forzado del micro");
+                showEmergencyKeyboard();
+            }
+        }
+
+        // --- SISTEMA DE EMERGENCIA (TECLADO) ---
+        function showEmergencyKeyboard() {
+            document.getElementById('emergencyKeyboard').classList.remove('hidden');
+            document.getElementById('manualInputText').focus();
+            if(document.getElementById('authScreen').classList.contains('hidden')) {
+                resetPublishBtnState();
+            } else {
+                resetAuthBtnState();
+            }
+        }
+        function hideEmergencyKeyboard() {
+            document.getElementById('emergencyKeyboard').classList.add('hidden');
+            document.getElementById('manualInputText').value = '';
+        }
+        function submitEmergencyText() {
+            let texto = document.getElementById('manualInputText').value.trim();
+            if(texto && activeVoiceCallback) {
+                hideEmergencyKeyboard();
+                activeVoiceCallback(texto);
+            }
+        }
+
+        // --- EL FLUJO CERO-UI (ONBOARDING) ---
+        function setUIDisplay(title, subtitle, state = "INIT") {
+            document.getElementById('mainTitle').innerText = title;
+            document.getElementById('subTitle').innerHTML = subtitle;
+            const btn = document.getElementById('giantPowerBtn');
+            const icon = document.getElementById('btnIcon');
+            const ring = document.getElementById('spinRing');
+
+            btn.classList.remove('power-listening', 'power-waiting', 'animate-pulse-glow');
+            icon.className = "fa-solid text-8xl text-white drop-shadow-lg transition-transform";
+
+            if (state === "SPEAKING") {
+                btn.classList.add('animate-pulse-glow');
+                icon.classList.add('fa-robot');
+                ring.classList.remove('hidden');
+            } else if (state === "WAITING_TAP") {
+                btn.classList.add('power-waiting');
+                icon.classList.add('fa-hand-pointer', 'animate-bounce');
+                ring.classList.add('hidden');
+            } else if (state === "LISTENING") {
+                btn.classList.add('power-listening');
+                icon.classList.add('fa-ear-listen', 'animate-bounce');
+                ring.classList.remove('hidden');
+            } else {
+                btn.classList.add('animate-pulse-glow');
+                icon.classList.add('fa-power-off');
+                ring.classList.remove('hidden');
+            }
+        }
+
+        function resetAuthBtnState() {
+            if(onboardStep !== "INIT") { setUIDisplay("ESPERANDO", "Ingresa datos", "WAITING_TAP"); }
+            else { setUIDisplay("UCRI", "Toca para iniciar", "INIT"); }
+        }
+
+        function powerButtonTapped() {
+            if (onboardStep === "INIT") {
+                onboardStep = "PREGUNTA_EMPRENDER";
+                setUIDisplay("HOLA", "Lyra hablando...", "SPEAKING");
+                
+                hablar("Hola. Soy Lyra, asistente de UCRI. Bienvenido a la comunidad de Cusco. ¿Deseas registrarte y crear tu propio emprendimiento?", () => {
+                    setUIDisplay("ESCUCHANDO", "Responde: Sí o No", "LISTENING");
+                    playBeep();
+                    escuchar("¿Deseas registrarte? (Escribe Sí o No):", (respuesta) => {
+                        let r = respuesta.toLowerCase();
+                        if(r.includes("sí") || r.includes("si") || r.includes("claro") || r.includes("quiero")) {
+                            onboardStep = "PREGUNTA_NOMBRES";
+                            setUIDisplay("¡GENIAL!", "Iniciando registro...", "SPEAKING");
+                            setTimeout(flujoRegistroNombres, 1000);
+                        } else {
+                            setUIDisplay("UCRI", "Vuelve pronto", "INIT");
+                            hablar("Entendido. Estaré aquí cuando me necesites.", () => { onboardStep = "INIT"; });
+                        }
+                    });
+                });
+            }
+        }
+
+        function flujoRegistroNombres() {
+            setUIDisplay("NOMBRES", "Lyra te habla...", "SPEAKING");
+            hablar("Excelente decisión. Empecemos. ¿Cuáles son tus nombres?", () => {
+                setUIDisplay("NOMBRES", "Habla ahora", "LISTENING");
+                playBeep();
+                escuchar("Escribe tus nombres:", (texto) => {
+                    tempUser.nombre = texto;
+                    onboardStep = "PREGUNTA_APELLIDOS";
+                    setUIDisplay(texto.toUpperCase(), "Guardado", "SPEAKING");
+                    setTimeout(flujoRegistroApellidos, 1500);
+                });
+            });
+        }
+
+        function flujoRegistroApellidos() {
+            setUIDisplay("APELLIDOS", "Lyra te habla...", "SPEAKING");
+            hablar(`Muy bonito nombre, ${tempUser.nombre}. ¿Cuáles son tus apellidos?`, () => {
+                setUIDisplay("APELLIDOS", "Habla ahora", "LISTENING");
+                playBeep();
+                escuchar("Escribe tus apellidos:", (texto) => {
+                    tempUser.apellidos = texto;
+                    onboardStep = "PREGUNTA_TELEFONO";
+                    setUIDisplay(texto.toUpperCase(), "Guardado", "SPEAKING");
+                    setTimeout(flujoRegistroTelefono, 1500);
+                });
+            });
+        }
+
+        function flujoRegistroTelefono() {
+            setUIDisplay("TELÉFONO", "Lyra te habla...", "SPEAKING");
+            hablar("Perfecto. ¿Cuál es tu número de teléfono para que los clientes te contacten?", () => {
+                setUIDisplay("TELÉFONO", "Dicta los números", "LISTENING");
+                playBeep();
+                escuchar("Escribe tu número de teléfono:", (texto) => {
+                    tempUser.telefono = texto.replace(/[^0-9+ ]/g, ''); 
+                    if(!tempUser.telefono) tempUser.telefono = texto; 
+                    onboardStep = "PREGUNTA_EMPRENDIMIENTO";
+                    setUIDisplay(tempUser.telefono, "Guardado", "SPEAKING");
+                    setTimeout(flujoRegistroEmprendimiento, 1500);
+                });
+            });
+        }
+
+        function flujoRegistroEmprendimiento() {
+            setUIDisplay("NEGOCIO", "Lyra te habla...", "SPEAKING");
+            hablar("Ya casi terminamos. ¿De qué trata tu emprendimiento o qué producto deseas vender?", () => {
+                setUIDisplay("NEGOCIO", "Habla ahora", "LISTENING");
+                playBeep();
+                escuchar("Escribe de qué trata tu negocio:", (texto) => {
+                    tempUser.emprendimiento = texto;
+                    onboardStep = "CREANDO";
+                    setUIDisplay("CREANDO", "Generando perfil...", "SPEAKING");
+                    
+                    hablar(`Todo listo. Estoy creando tu perfil para ${texto}. Dame un segundo...`, () => {
+                        crearPerfilFinal();
+                    });
+                });
+            });
+        }
+
+        function crearPerfilFinal() {
+            let fullName = `${tempUser.nombre} ${tempUser.apellidos}`;
+            currentUser = { 
+                id: 'user_' + Date.now(), 
+                name: fullName, 
+                condition: "Discapacidad Visual", 
+                bio: `Fundador de: ${tempUser.emprendimiento}. Creador Inclusivo de UCRI.`, 
+                phone: tempUser.telefono,
+                enterprise: tempUser.emprendimiento,
+                avatar: "", cover: "" 
+            };
+            
+            usersDB.push(currentUser); 
+            localStorage.setItem('ucri_users_db', JSON.stringify(usersDB));
+            localStorage.setItem('ucri_session', JSON.stringify(currentUser));
+            
+            checkAuth();
+            hablar(`Felicidades ${tempUser.nombre}. Tu cuenta ha sido activada y tu tienda está lista para vender.`);
+        }
+
+        // --- DASHBOARD Y VENTAS (ZERO-UI) ---
+        function checkAuth() {
+            const sessionData = localStorage.getItem('ucri_session');
+            if(sessionData) {
+                currentUser = JSON.parse(sessionData);
+                document.getElementById('authScreen').classList.add('hidden');
+                document.getElementById('mainDashboard').classList.remove('hidden');
+                loadProfileUI(); 
+                loadServices(); 
+            } else {
+                document.getElementById('authScreen').classList.remove('hidden');
+                document.getElementById('mainDashboard').classList.add('hidden');
+                onboardStep = "INIT";
+                setUIDisplay("UCRI", "Toca para iniciar", "INIT");
+            }
+        }
+
+        function logout() { localStorage.removeItem('ucri_session'); location.reload(); }
+
+        function loadProfileUI() {
+            document.getElementById('profileName').innerText = currentUser.name;
+            document.getElementById('profileEnterprise').innerText = currentUser.enterprise || "Emprendedor UCRI";
+            document.getElementById('profilePhone').innerText = currentUser.phone || "Sin teléfono";
+            
+            let inits = currentUser.name.match(/\b\w/g) || [];
+            inits = ((inits.shift() || '') + (inits.pop() || '')).toUpperCase();
+            document.getElementById('profileInitials').innerText = inits;
+        }
+
+        function setPublishUI(text, state) {
+            document.getElementById('createText').innerHTML = text;
+            const icon = document.getElementById('createIcon');
+            const box = document.getElementById('createIconBox');
+            
+            icon.className = "fa-solid text-5xl text-black transition-transform";
+            
+            if(state === "SPEAKING") {
+                box.className = "w-24 h-24 rounded-full flex justify-center items-center transition-all bg-white shadow-[0_0_40px_rgba(255,255,255,0.8)]";
+                icon.classList.add('fa-robot', 'animate-pulse');
+            } else if (state === "LISTENING") {
+                box.className = "w-24 h-24 rounded-full flex justify-center items-center transition-all bg-andino-cyan shadow-[0_0_40px_rgba(6,182,212,0.8)]";
+                icon.classList.add('fa-ear-listen', 'animate-bounce');
+            } else {
+                box.className = "w-24 h-24 rounded-full flex justify-center items-center transition-all bg-andino-gold shadow-[0_0_40px_rgba(245,158,11,0.8)]";
+                icon.classList.add('fa-microphone-lines');
+            }
+        }
+
+        function resetPublishBtnState() {
+            if(publishStep !== "INIT") { setPublishUI("ESPERANDO<br>ENTRADA", "WAITING_TAP"); }
+            else { publishStep = "INIT"; setPublishUI("Vender un<br>Producto", "INIT"); }
+        }
+
+        function startCreateServiceFlow() {
+            if(publishStep === "INIT") {
+                // Solicitar permisos por si acaso (si el usuario ya estaba logueado de antes)
+                if(!isMicrophoneAuthorized) {
+                    navigator.mediaDevices.getUserMedia({ audio: true }).then(s => { s.getTracks().forEach(t => t.stop()); isMicrophoneAuthorized = true; initiatePublish(); }).catch(e => { isMicrophoneAuthorized = false; initiatePublish(); });
+                } else {
+                    initiatePublish();
+                }
+            }
+        }
+
+        function initiatePublish() {
+            publishStep = "ASK_TITLE";
+            setPublishUI("Escucha...", "SPEAKING");
+            hablar("Iniciando publicación. ¿Cuál es el nombre del producto o servicio que vas a vender hoy?", () => {
+                setPublishUI("ESCUCHANDO...", "LISTENING");
+                playBeep();
+                escuchar("Escribe el nombre del producto:", (titulo) => {
+                    tempService.titulo = titulo;
+                    publishStep = "ASK_PRICE";
+                    setPublishUI(titulo.toUpperCase(), "SPEAKING");
+                    setTimeout(askPrice, 1000);
+                });
+            });
+        }
+
+        function askPrice() {
+            setPublishUI("Procesando...", "SPEAKING");
+            hablar(`Entendido, ${tempService.titulo}. ¿Cuál es el precio en soles?`, () => {
+                setPublishUI("DIME EL PRECIO", "LISTENING");
+                playBeep();
+                escuchar("Escribe el precio en números:", (precio) => {
+                    tempService.precio = precio.replace(/[^0-9.]/g, '') || "50";
+                    publishStep = "ASK_DESC";
+                    setPublishUI(`S/ ${tempService.precio}`, "SPEAKING");
+                    setTimeout(askDesc, 1000);
+                });
+            });
+        }
+
+        function askDesc() {
+            setPublishUI("Describe tu<br>producto", "SPEAKING");
+            hablar("Casi listos. Dicta una descripción corta para atraer a los clientes.", () => {
+                setPublishUI("HABLA AHORA", "LISTENING");
+                playBeep();
+                escuchar("Escribe la descripción del producto:", (desc) => {
+                    tempService.desc = desc;
+                    publishStep = "PUBLISHING";
+                    setPublishUI("PUBLICANDO...", "SPEAKING");
+                    
+                    hablar("Procesando con Inteligencia artificial... Tu producto ha sido publicado en la tienda principal de UCRI.", () => {
+                        let allServices = JSON.parse(localStorage.getItem('ucri_global_services')) || [];
+                        allServices.unshift({
+                            id: Date.now(), userId: currentUser.id, name: currentUser.name, cond: currentUser.condition,
+                            titulo: tempService.titulo.charAt(0).toUpperCase() + tempService.titulo.slice(1), 
+                            price: tempService.precio, precio: tempService.precio, desc: tempService.desc,
+                            img: "https://images.unsplash.com/photo-1605372540502-0c918a2bc4a8?q=80&w=400" 
+                        });
+                        localStorage.setItem('ucri_global_services', JSON.stringify(allServices));
+                        loadServices();
+                        publishStep = "INIT";
+                        setPublishUI("Vender un<br>Producto", "INIT");
+                    });
+                });
+            });
+        }
+
+        function loadServices() {
+            const feed = document.getElementById('feedServicios');
+            let allServices = JSON.parse(localStorage.getItem('ucri_global_services')) || [];
+            let myServices = allServices.filter(s => s.userId === currentUser.id);
+
+            if(myServices.length === 0) { 
+                feed.innerHTML = `<div class="text-center p-12 glass-card border-dashed"><i class="fa-solid fa-box-open text-6xl text-white/30 mb-4"></i><h3 class="font-bold text-2xl text-white/70">Aún no vendes nada</h3></div>`; return; 
+            }
+            feed.innerHTML = myServices.map(s => `
+                <div class="glass-card p-8 flex flex-col relative animate-pop shadow-2xl">
+                    <h4 class="font-display font-black text-3xl mb-2 text-white">${s.titulo}</h4>
+                    <p class="font-bold text-3xl text-andino-gold mb-6">S/ ${s.price}</p>
+                    <p class="text-xl font-medium text-white/80 bg-black/30 p-5 rounded-2xl mb-8 leading-relaxed">${s.desc}</p>
+                    <button onclick="deleteService(${s.id})" class="mt-auto py-5 bg-andino-magenta/80 hover:bg-andino-magenta text-white font-black text-2xl rounded-2xl uppercase tracking-widest transition shadow-lg flex justify-center items-center gap-3">
+                        <i class="fa-solid fa-trash"></i> Eliminar
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function deleteService(id) {
+            hablar("Producto eliminado del catálogo.");
+            let srvs = JSON.parse(localStorage.getItem('ucri_global_services')) || [];
+            localStorage.setItem('ucri_global_services', JSON.stringify(srvs.filter(s => s.id !== id))); loadServices();
+        }
+
+        checkAuth();
+    </script>
+</body>
+</html>
